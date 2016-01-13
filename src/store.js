@@ -3,7 +3,7 @@ import { entries } from "./utils";
 import dispatcher from "./dispatcher";
 import _ from "lodash";
 import { mixin } from "./mixins";
-
+import { Iterable } from "immutable";
 export const stores = {};
 
 function buildActionList( handlers ) {
@@ -59,16 +59,40 @@ function addListeners( listeners, key, handler ) {
 	listeners[ key ].push( handler.handler || handler );
 }
 
+function customMerge( object, source ) {
+	let props = _.keys( source ) || source;
+
+	_.forEach( props, function( srcValue, key ) {
+		key = srcValue;
+		srcValue = source[key];
+
+		if ( Iterable.isIterable( srcValue ) ) {
+			let objVal = object[key] || {};
+			if ( _.isEmpty( objVal ) ) {
+				object[key] = srcValue;
+			}
+		} else if ( _.isObject( srcValue ) ) {
+			object[key] = _.merge( object[key] || {}, srcValue );
+		} else {
+			object[key] = srcValue;
+		}
+	} );
+
+	return object;
+}
+
 function processStoreArgs( ...options ) {
 	const listeners = {};
 	const handlers = {};
-	const state = {};
+	let state = {};
 	const otherOpts = {};
 	options.forEach( function( o ) {
 		let opt;
 		if ( o ) {
 			opt = _.clone( o );
-			_.merge( state, opt.state );
+
+			state = customMerge( state, opt.state );
+
 			if ( opt.handlers ) {
 				Object.keys( opt.handlers ).forEach( function( key ) {
 					let handler = opt.handlers[ key ];
@@ -84,6 +108,7 @@ function processStoreArgs( ...options ) {
 			}
 			delete opt.handlers;
 			delete opt.state;
+
 			_.merge( otherOpts, opt );
 		}
 	} );
